@@ -1,0 +1,15 @@
+matplotlib
+numpy
+setuptools
+rpy2
+gunicorn
+django
+django-heroku
+pandas
+datetime
+seaborn
+Pillow
+python-telegram-bot
+iexfinance
+pmdarima
+scipy==1.1.0
