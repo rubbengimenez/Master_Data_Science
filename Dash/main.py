@@ -141,7 +141,8 @@ def indicator(color, text, id_value):
 
 ### DASHBOARD APP ###
 
-app = dash.Dash()
+app = dash.Dash(__name__)
+server = app.server
 
 # Boostrap CSS.
 app.css.append_css({"external_url": "https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css"}) # noqa: E501

@@ -61,6 +61,9 @@ Another example of an interactive web app using the Shiny package including geos
 
 ### Dash Project <a name="dash"></a>
 Another example of an interactive web app using the Dash package and Python.
+
+Link: https://dasheu2018desi.herokuapp.com/
+
 <img src="assets/images/dash_1.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
 <img src="assets/images/dash_2.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
 
