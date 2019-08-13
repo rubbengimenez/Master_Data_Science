@@ -13,6 +13,7 @@ This is a repository with some examples of the projects I developed during my Ma
 6. [Shiny App 2](#shiny2)
 7. [Dash Web App](#dash)
 8. [Tweets Analysis](#tweets)
+9. [Investment Telegram Bot](#bot)
 
 ### Active Learning <a name="al"></a>
 To solve a classification problem combining active learning and diversity algorithms using a SVM as a base classifer.
@@ -76,7 +77,7 @@ In this project, the capture and processing of tweets is carried out in order to
 <img src="assets/images/tweet_1.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
 <img src="assets/images/tweet_2.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
 
-### Investment Telegram Bot
+### Investment Telegram Bot <a name="bot"></a>
 Chatbot that acts as a personal investment assistant integrated into an instant messaging platform as Telegram.
 
 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Telegram_alternative_logo.svg/1024px-Telegram_alternative_logo.svg.png" width="30" style="margin-right:0px; border: 0px solid #ccc;" /> : @CDNG6_bot
