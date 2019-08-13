@@ -1,5 +1,7 @@
-# Master_Data_Science
-#### Rubén Giménez Martín
+<h1 style = "text-align:center; font-size:300%"> Master_Data_Science </h1>
+<h4 style = "text-align:center; font-size:150%">Rubén Giménez Martín</h4>
+<br>
+
 This is a repository with some examples of the projects I developed during my Master's Degree in Data Science.
 <br>
 ### Table of Contents
