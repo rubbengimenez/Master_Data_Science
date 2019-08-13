@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1552647250204.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "773386497",
+    "id" : "954BA6B8",
+    "lastKnownWriteTime" : 1552650861,
+    "last_content_update" : 1552650861495,
+    "path" : "F:/DISCO F/Master_Data_Science/ShinyApp_I/RubenGimenezMartin_ShinyApp/RubenGimenezMartin_ShinyApp.R",
+    "project_path" : "RubenGimenezMartin_ShinyApp.R",
+    "properties" : {
+        "cursorPosition" : "111,39",
+        "scrollLine" : "79"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

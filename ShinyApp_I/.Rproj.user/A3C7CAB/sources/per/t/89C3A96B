@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1552481555380.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "5411862",
+    "id" : "89C3A96B",
+    "lastKnownWriteTime" : 1552482067,
+    "last_content_update" : 1552482067164,
+    "path" : "C:/Users/rubbe/Desktop/RubenGimenezMartin_ShinyApp/RubenGimenezMartin_ShinyApp.R",
+    "project_path" : "RubenGimenezMartin_ShinyApp.R",
+    "properties" : {
+        "cursorPosition" : "30,0",
+        "scrollLine" : "16"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

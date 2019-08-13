@@ -1,0 +1,540 @@
+---
+title: "Tarea Visualización de Datos Espaciales"
+author: "Rubén Giménez Martín"
+date: "3 de marzo de 2019"
+output: 
+  html_document: 
+    theme: readable
+    toc: yes
+    toc_depth: 4
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+packages = c('readxl','tidyverse','ggplot2','stringr','tidyr','raster','tmap','maptools', 'magrittr', 'devtools', 'ggmap','tmaptools','magick', 'animation','geospatial',  'installr', 'leaflet','leaflet.extras', 'rlang')
+#use this function to check if each package is on the local machine
+#if a package is installed, it will be loaded
+#if any are not, the missing package(s) will be installed and loaded
+package.check <- lapply(packages, FUN = function(x) {
+  if (!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = TRUE)
+    library(x, character.only = TRUE)
+  }
+})
+
+if(!suppressWarnings(require(c('geospatial', 'installr', 'photon')))){devtools::install_github("cwickham/geospatial")
+  devtools::install_github('talgalili/installr')
+  devtools::install_github(repo = 'rCarto/photon') } # La instalación no se realiza desde cran sino desde esta ubicación
+library(geospatial)
+library(installr)
+library(photon)
+
+
+# install.ImageMagick()
+# library(animation) no debería hacer falta
+
+rm(package.check, packages)
+'%not in%' = Negate('%in%')
+```
+
+
+### 1. Descarga y acondiciona los datos de población de las tres provincias de la Comunidad Valenciana, por municipios, de la página web del Instituto Nacional de Estadística Padrón municipalasíobtendráslosvaloresdelpadrónmunicipaldurantelosúltimosaños(2puntos )
+
+Los datos utilizados serán descargados de https://www.ine.es/dynt3/inebase/index.htm?padre=525 
+
+Información adicional sobre los datos proporcionada por el INE:
+
+* Si en la serie de datos en algún año no existe población es porque a la fecha de referencia no existía el municipio.
+
+* No existen cifras a 1 de enero de 1997 porque no se realizó revisión del padrón para ese año.
+
+* Las cifras de 1996 están referidas a 1 de mayo y las demás a 1 de enero.
+
+```{r}
+#se importan los municipios de las tres provincias por separado y se unen en un único dataframe
+Alicante <- read_excel("data/Alicante.xlsx")
+Castellon <- read_excel("data/Castellon.xlsx")
+Valencia <- read_excel("data/Valencia.xlsx")
+
+com_val_ine <- Alicante %>% bind_rows(Castellon) %>% bind_rows(Valencia)
+names(com_val_ine)[1] <- "munycp"
+rm(Alicante, Castellon, Valencia)
+
+# con  códigos postales
+# com_val_ine2 <- mutate(com_val_ine, cp = str_sub(string = com_val_ine$munycp, start = 1, end = 5), Municipios = str_sub(com_val_ine$munycp, start = 7)) %>% dplyr::select( - munycp) %>% dplyr::select(cp, Municipios, 1:23)
+
+# sin códigos postales
+com_val_ine <- mutate(com_val_ine, Municipios = str_sub(com_val_ine$munycp, start = 7)) %>% dplyr::select( - munycp) %>% dplyr::select(Municipios, 1:23)
+
+head(com_val_ine)
+```
+
+### 2. Descarga un mapa de la Comunidad Valenciana por municipios y añade la información descargada del padrón municipal. (2 puntos )
+
+Se descarga el mapa de la Comunidad Valenciana:
+```{r}
+spain <- getData('GADM', country='ESP', level=4) #nivel municipios
+names(spain@data)[10] <- "Municipios"
+com_val_mapa <- spain[spain@data$NAME_1 == "Comunidad Valenciana",]
+plot(com_val_mapa)
+```
+
+#### Normalización del nombre de los municipios para ambos conjuntos de datos para poder hacer el merge
+
+Se observa que hay nombres de municipios en el dataset extraido del INE que no coinciden con los del paquete de mapas.
+```{r}
+muni_map <- filter(spain@data, spain@data$NAME_1 == "Comunidad Valenciana") %>% dplyr::select(Municipios) 
+muni_map <- muni_map$Municipios #municipios en el mapa
+muni_map <- unique(muni_map) #solo únicos
+ine_map <- com_val_ine$Municipios #municipios en el ine
+```
+
+
+Lo primero que se observa es que hay nombres con su traducción en castellano y en valenciao separados por una "/".
+```{r}
+ine_slash <- ine_map[str_detect(string = ine_map, pattern = "/")]
+ine_slash
+```
+
+Se observa que la mayoría de ellos, concretamente 23/34, tienen su versión en castellano en la parte de la izquierda de la "/" separadora. De estos se cogerá esta parte. De los otros (los en valenciano en la parte de la izquierda), se cogerá la parte de la derecha.
+```{r}
+
+idx_slash <- which(ine_map %in% ine_slash) #municipios del ine con "/"
+
+# ine_map_copia <- ine_map
+
+idx_ine_slash <- c(6,11,15,17,21,23,24,28,30,31,34) # municipios con "/" y castellano a la derecha en ine_slash
+
+for (i in idx_slash) {
+  # castellano a la derecha
+  if(ine_map[i] %in% ine_slash[idx_ine_slash]) ine_map[i] <- word(ine_map[i],2,sep = "/")
+  # castellano a la izquierda
+  else ine_map[i] <- word(ine_map[i],1,sep = "/")
+  
+}
+
+# se comprueba que se han elegido bien
+ine_map[idx_slash]
+rm(idx_slash,idx_ine_slash)
+```
+
+Se observa a continuación que hay varios municipios en el dataset extraido del INE con los articulos al final, antes de una ",". Se comprueba cuales son:
+```{r}
+ine_arti <- ine_map[str_detect(string = ine_map, pattern = "^(.*),")]
+idx_art <-  str_which(string = ine_map, pattern = "^(.*),")
+ine_arti
+```
+
+Se decide llevar estos artículos hacia adelante y sustituirlos por mayúscula. Se observa primero que artículos son:
+```{r}
+unique(sub(pattern = "^(.*),", replacement = ",", x = ine_arti))
+```
+
+Se lleva a cabo el proceso
+```{r}
+bad_art <- unique(sub(pattern = "^(.*),", replacement = "^(.*),", x = ine_arti))
+good_art <-  c("L'\\1", "El \\1", "Los \\1",  "La \\1", "Els", "Les \\1", "El \\1", "La \\1" )
+
+for (i in 1:length(ine_map)) {
+  for (j in 1:length(bad_art)) {
+    if(str_detect(string = ine_map[i], pattern = bad_art[j])) {
+      ine_map[i] <- sub(pattern =bad_art[j], replacement = good_art[j], x = ine_map[i],ignore.case = TRUE)
+      break}
+    else next
+  }
+  
+}
+
+ine_map[idx_art]
+```
+
+Se comprueba a continuación cuantos coinciden.
+```{r}
+coinciden <- ine_map[ine_map %in% muni_map] # los de ine_map que están en muni_map
+no_coinciden_ine <- ine_map[ine_map %not in% muni_map] # los de ine_map que no están en muni_map
+idx_no_coinciden_ine <- which(ine_map %not in% muni_map) # indice de lo de arriba
+
+cat("Los de ine_map que no están en muni_map\n")
+no_coinciden_ine
+cat("\n\nLos de muni_map que no están en ine_map\n")
+no_coinciden_map<- muni_map[muni_map %not in% ine_map] #Los de muni_map que no están en ine_map
+no_coinciden_map
+```
+
+Para forzar a encontrar similitudes entre estos pocos municipios que quedan se decide hacer uso del paquete [RecordLinkage](https://cran.r-project.org/web/packages/RecordLinkage/index.html). Concretamente se utiliza la función `levenshteinSim`:
+*`levenshteinDist` returns the Levenshtein distance, which cannot be directly used as a valid string comparator. `levenshteinSim` is a similarity function based on the Levenshtein distance, calculated by 1 - d(str1,str2) / max(A,B), where d is the Levenshtein distance function and A and B are the lenghts of the strings.*
+
+Se realiza primero una prueba de funcionamiento
+```{r message=FALSE}
+library(RecordLinkage)
+ine_map_copia <- ine_map
+
+score <- 0.5 #margen arbitrario del 0.5 de score para encontrar similitud
+aux <- c() # se almacenan aqui los nombres de municipios que van a cambiar para comprobar el teest 
+
+
+for (i in idx_no_coinciden_ine[-34]) {
+  if(max(levenshteinSim(ine_map[i], no_coinciden_map))>score){
+    aux <- c(aux, no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))])
+    # ine_map[i] <- no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))]
+    cat(ine_map[i],"-------->",no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))], "\n")
+  }
+}
+```
+
+Se observa que de todos los municipios que logra encontrar solo falla en Sant Joanet, que en el paquete de mapas está en castellano. Se retira ese municipio para cambiarse próximamente. En Alfara de la Baronia y Alfara de Algimia acierta de casualidad, el pueblo cambió de nombre en 2010.
+
+```{r}
+idx_no_coinciden_ine_sanjoanet <- idx_no_coinciden_ine[-which(no_coinciden_ine == "Sant Joanet")] #sin San Joanet
+
+ine_map_copia <- ine_map
+
+score <- 0.5 #margen arbitrario del 0.5 de score para encontrar similitud
+aux <- c() # se almacenan aqui los nombres de municipios que van a cambiar para comprobar el teest 
+
+cat("Nombres Cambiados:\n\n")
+for (i in idx_no_coinciden_ine_sanjoanet) {
+  if(max(levenshteinSim(ine_map[i], no_coinciden_map))>score){
+    aux <- c(aux, no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))])
+    ine_map[i] <- no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))]
+    cat(ine_map_copia[i],"-------->",no_coinciden_map[which.max(levenshteinSim(ine_map[i], no_coinciden_map))], "\n")
+  }
+}
+
+
+```
+
+A continuación se comprueba cuantos municipios quedan por cambiar, los cuales, se cambiarán manualmente.
+```{r}
+no_coinciden_ine2 <- ine_map[ine_map %not in% muni_map] # los de ine_map que no están en muni_map
+no_coinciden_ine2
+```
+
+```{r}
+good_muni <- c("Adsubia", "Puig", "Real de Montroi", "San Juan de Énova")
+
+for (i in 1:length(no_coinciden_ine2))ine_map[which(ine_map == no_coinciden_ine2[i])] <- good_muni[i]
+```
+
+```{r}
+no_coinciden_ine3 <- ine_map[ine_map %not in% muni_map] # los de ine_map que no están en muni_map
+
+# Se comprueba que todos coinciden y que no hay nada repetido en los municipios que serán pegados al dataset del INE
+length(intersect(ine_map, muni_map))
+n_distinct(ine_map)
+```
+
+
+Hay alguno que no esté?
+```{r}
+FALSE %in% (ine_map %in% muni_map)
+```
+
+
+Última comprobación.
+```{r}
+head(com_val_ine$Municipios, 25)
+```
+```{r}
+head(ine_map, 25)
+```
+
+**Se procede al gran acontecimiento.** (Cambiar los nombres del dataset del INE por los nombres necesarios para poder hacer el merge completo con los municipios del paquete de mapas)
+```{r}
+com_val_ine$Municipios <- ine_map
+
+# save(com_val_ine, file = "INE.Rdata")
+```
+
+```{r}
+rm(list=setdiff(ls(), c("com_val_ine", "com_val_mapa", "spain")))
+```
+
+#### Se continúa con el ejercicio
+
+```{r}
+CV_map<-sp::merge(com_val_mapa,com_val_ine,by.x="Municipios",by.y="Municipios")
+
+str(CV_map,max.level = 2)
+```
+
+
+```{r}
+# Herramientas
+
+colores <- rev(viridisLite::plasma(9))
+
+# colores <- get_brewer_pal("Oranges", n = 8, contrast = c(0.05, 0.67), plot = F)
+
+breaks <- c(0, 500, 2500, 5000, 10000, 20000, 70000, 150000, 250000,Inf)
+
+
+my_labels <- c("De 0 a 500 habitantes",
+               "De 500 a 2,500 habitantes",
+               "De 2,500 a 5,000 habitantes",
+               "De 5,000 a 10,000 habitantes",
+               "De 10,000 a 20,000 habitantes",
+               "De 20,000 a 70,000 habitantes",
+               "De 70,000 a 150,000 habitantes",
+               "De 150,000 a 250,000 habitantes",
+               "250,000 o más habitantes")
+
+# colores <- get_brewer_pal("PuRd", n = 10, contrast = c(0, 0.77), plot = F)
+```
+
+
+#### Presentación del mapa de la Comunidad Valenciana con la información de los municipios descargados
+```{r}
+tmap_mode("plot")
+
+tm_shape(CV_map)+
+    tm_fill(col = "2018",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio"))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana", 2018), 
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.4, 
+              legend.outside.position = c("right"),
+              bg.color = "gray88", 
+              frame = FALSE,
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+    tm_polygons()+
+    tm_compass(type = "rose", 
+               position = c("left", "top"), 
+               color.dark = "gray48", 
+               color.light= "gray85", 
+               size = 2)
+```
+
+
+#### Presentación del mapa de la Comunidad Valenciana con la información de los municipios descargados en modo interactivo
+
+```{r}
+tmap_mode("plot")
+mapint <- tm_shape(CV_map)+
+    tm_fill(col = "2018",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Habitantes por municipio, Comunidad Valenciana", 2018))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana", 2018), 
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.4, 
+              legend.outside.position = c("right") ,
+              bg.color = "gray88", 
+              frame = FALSE,
+              inner.margin = 0.1, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+    tm_polygons()
+
+
+
+leafmap <- tmap_leaflet(mapint)
+
+leafmap %>% addProviderTiles("OpenStreetMap") %>% 	setView(lng	=	 1.888587 , lat	=	39.495297   , zoom	=	7) %>% leaflet.extras::	addResetMapButton()
+
+
+
+```
+
+
+
+### 3. Visualiza un mapa de la Comunidad que muestre la evolución de la población, por municipios. Dibuja un mapa por año (2 puntos) .
+
+
+Se crea primero una visualización del mapa para cada uno de los años, desde 1998 hasta 2018. Se decide no visualizar los años de 1996 y 1997 debido al hecho de que no existen datos para 1997.
+```{r message=FALSE, warning=FALSE}
+tmap_mode("plot")
+for (i in 1998:2018) {
+  map <- tm_shape(CV_map)+
+    tm_fill(col = paste(i),
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio"))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana", paste(i)), 
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.4, 
+              legend.outside.position = c("right") ,
+              bg.color = "gray88", 
+              frame = FALSE,
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+    tm_polygons()+
+    tm_compass(type = "rose", 
+               position = c("left", "top"), 
+               color.dark = "gray48", 
+               color.light= "gray85", 
+               size = 2)
+  print(map)
+  
+  
+}
+```
+
+A continuación se modifica el dataframe para poder mostrar los mapas en un grid.
+```{r}
+CV_map_T <- CV_map
+CV_map_T@data <- CV_map_T@data %>% gather(year, population,'2018':'1998') %>% dplyr:: select(-c("1996","1997"))
+```
+
+Se visualiza el grid con todos los años.
+```{r message=FALSE, warning=FALSE}
+tmap_mode("plot")
+years <- 1998:2018
+
+tmap_mode("plot")
+
+  tm_shape(CV_map_T)+
+    tm_fill(col = "population",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio"))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana"),
+              main.title.position = "center",
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.1, 
+              legend.outside.position = c("right"),
+              bg.color = "gray88", 
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+  tm_facets(by= "year",ncol = 5, nrow = 5 ,free.coords = FALSE)
+```
+
+Dado que hay 21 años la visualización es dificil en un único grid. Por lo tanto, se proyecta en grids de 2X2.
+```{r}
+tmap_mode("plot")
+
+tm_shape(CV_map_T)+
+    tm_fill(col = "population",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio"))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana"),
+              main.title.position = "center",
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.25, 
+              legend.outside.position = c("right"),
+              bg.color = "gray88", 
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+  tm_facets(by= "year",ncol = 2, nrow = 2 ,free.coords = FALSE)
+```
+
+
+### 4. Revisa el capítulo 8 del libro Geocomputation with R, Making Maps in R y haz que se muestre la evolución de la población en forma de animación en una misma gráﬁca. (1 punto)
+
+```{r}
+tmap_mode("plot")
+
+years <- 1998:2018
+
+mapagif <- tm_shape(CV_map_T)+
+    tm_fill(col = "population",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio en", paste(years)))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste("Comunidad Valenciana,", paste(years)),
+              main.title.position = "center",
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.25, 
+              legend.outside.position = c("right"),
+              bg.color = "gray88", 
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+
+  tm_facets(along = "year", free.coords = FALSE)
+
+
+# CONECTAR PARA VOLVER A CREAR EL GIF
+
+# tmap_animation(mapagif, filename = "Municipios_Poblacion_CV_1.gif", delay = 70)
+
+
+```
+
+![Evolución de la población los Municipios en la Comunidad Valenciana 1998-2018](Municipios_Poblacion_CV_1.gif)   
+
+
+
+### 5. Integrar la aplicación en un Shiny para que el usuario pueda elegir la provincia a representar. (1p)
+
+Se procede a guardar los objetos necesarios para reproducir un shiny app.
+
+```{r}
+save(CV_map, CV_map_T, file = "CV_data.Rdata")
+```
+
+Comprobación del funcionamiento de los mapas por provincias
+```{r}
+provincias <- c("Alicante", "Castellón", "Valencia")
+
+
+for (i in 1:length(provincias)) {
+  map <- tm_shape(CV_map[CV_map@data$NAME_2 == provincias[i],])+
+    tm_fill(col = "2018",
+            style = "fixed", 
+            palette = colores, 
+            breaks = breaks ,
+            labels = my_labels,
+            title = paste("Número de habitantes por municipio"))+
+    tm_borders(alpha =  0.7)+
+    tm_layout(main.title = paste(provincias[i], 2018), 
+              title.size = 2,
+              legend.outside = T,
+              legend.outside.size = 0.4, 
+              legend.outside.position = c("right"),
+              bg.color = "gray88", 
+              frame = FALSE,
+              inner.margin = 0.001, 
+              outer.margins = 0.05, 
+              legend.width = 11)+ tm_polygons()
+  print(map)
+  
+}
+
+```
+
+**La aplicación Shiny ha sido creada y almacenada en la carpeta maps.**
+
+![1. Aplicación Shiny](App_1.PNG)  
+
+![2. Aplicación Shiny](App_2.PNG)  
+
+### 6. Realiza rel curso de Datacamp https://www.datacamp.com/courses/interactive-mapswith-leaﬂet-in-r (2puntos)
+
+Realizado
+![Certificado de DataCamp](certificado.JPG)    
+
+
