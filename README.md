@@ -19,12 +19,9 @@ To solve a classification problem combining active learning and diversity algori
 + Diversity by clustering
 <br>
 
-<img src="assets/images/al.png" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
+<img src="assets/images/al.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
 
 ### Spark-MLlib Task
 To load, process and evaluate different clustering and classification algorithms provided by the Spark MLlib library on the classic MNIST data set using Watson Studio.
 
-<img src="assets/images/pyspark_mllib.png" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
-
-PRUEBA
-![](assets/images/pyspark_mllib.png)
+<img src="assets/images/pyspark_mllib.PNG" width="500" style="margin-right:5px; border: 1px solid #ccc;" />
